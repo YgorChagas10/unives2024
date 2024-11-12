@@ -1,0 +1,61 @@
+import requests
+import pandas as pd
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# 1. Coleta de Dados
+
+# Coleta de dados de vacinação
+url_vacinacao = "https://www.servicos.gov.br/api/v1/servicos/5510"
+data_vacinacao = requests.get(url_vacinacao).json()
+df_vacinacao = pd.DataFrame(data_vacinacao)
+
+# Coleta de dados de malha dos estados do IBGE
+# Criar uma lista de estados para coletar as malhas
+estados = range(1, 28)  # IDs dos estados de 1 a 27
+malhas = []
+
+for estado_id in estados:
+    url_ibge = f"https://servicodados.ibge.gov.br/api/v3/malhas/estados/{estado_id}"
+    response = requests.get(url_ibge)
+    if response.status_code == 200:
+        malhas.append(response.json())
+
+# Converter as malhas para um DataFrame (ajuste conforme necessário)
+df_malhas = pd.DataFrame(malhas)
+
+# 2. Processamento de Dados
+
+# Limpeza dos dados
+df_vacinacao.dropna(inplace=True)
+df_malhas.dropna(inplace=True)
+
+# Supondo que as colunas 'codigo_municipio' sejam comuns para integração (ajuste conforme necessário)
+# Aqui pode ser necessário mapear os dados corretamente entre DF
+df_integrado = pd.merge(df_vacinacao, df_malhas, left_on='codigo_estado', right_on='id')
+
+# 3. Análise Exploratória
+
+# Gráfico de barras das taxas de vacinação por estado
+plt.figure(figsize=(10, 6))
+sns.barplot(x='nome_estado', y='taxa_vacinacao', data=df_integrado)  # Ajuste os nomes das colunas
+plt.title('Taxa de Vacinação por Estado')
+plt.xlabel('Estado')
+plt.ylabel('Taxa de Vacinação (%)')
+plt.xticks(rotation=45)
+plt.show()
+
+# 4. Visualização Geoespacial
+
+# Carregar os dados das malhas em um GeoDataFrame
+gdf_malhas = gpd.GeoDataFrame(df_integrado)
+
+# Plotar o mapa
+fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+gdf_malhas.boundary.plot(ax=ax, linewidth=1)
+gdf_malhas.plot(column='taxa_vacinacao', cmap='OrRd', legend=True, ax=ax,
+           legend_kwds={'label': "Taxa de Vacinação (%)",
+                        'orientation': "horizontal"})
+plt.title('Mapa de Vacinação contra COVID-19 no Brasil')
+plt.show()
